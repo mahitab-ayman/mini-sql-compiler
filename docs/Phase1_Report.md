@@ -50,6 +50,8 @@ def add_error(self, message, line=None, column=None):
         "line": line,
         "column": column
     })
+```
+
 At the end of the analysis:
 - **`has_errors()`** checks if any errors occurred.  
 - **`get_errors()`** retrieves all recorded errors for display.  
