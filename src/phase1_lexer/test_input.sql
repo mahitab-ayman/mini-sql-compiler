@@ -1,8 +1,7 @@
 -- SQL Test Input for Nile University Students
 
-## Creating the table for 
-Nile University students
-#
+/* Creating the table for 
+Nile University students */
 
 CREATE TABLE Students (
     student_id INT,
