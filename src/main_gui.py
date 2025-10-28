@@ -1,4 +1,4 @@
-import sys
+import sys, csv
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton,
     QTextEdit, QTabWidget, QTableWidget, QTableWidgetItem,
@@ -22,8 +22,8 @@ class LexicalAnalyzerGUI(QWidget):
         # Title
         title = QLabel("Mini SQL Compiler — Phase 1: Lexical Analysis")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(QFont("Segoe UI", 18, QFont.Weight.Bold))
-        title.setStyleSheet("color: #61dafb;")  # light blue accent
+        title.setFont(QFont("JetBrains Mono", 18, QFont.Weight.Bold))
+        title.setStyleSheet("color: #4da6ff;")  # professional blue accent
 
         # SQL input
         self.sql_input = QTextEdit()
@@ -31,9 +31,9 @@ class LexicalAnalyzerGUI(QWidget):
         self.sql_input.setFont(QFont("Consolas", 12))
         self.sql_input.setStyleSheet("""
             QTextEdit {
-                background-color: #1e1e1e;
-                color: #e8e8e8;
-                border: 1px solid #3c3c3c;
+                background-color: #111111;
+                color: #e0e0e0;
+                border: 1px solid #333333;
                 border-radius: 6px;
             }
         """)
@@ -41,41 +41,65 @@ class LexicalAnalyzerGUI(QWidget):
         # Buttons
         button_layout = QHBoxLayout()
 
-        run_button = QPushButton("Run Lexical Analysis")
-        run_button.clicked.connect(self.run_lexer)
-        run_button.setFixedHeight(40)
-        run_button.setStyleSheet("""
+        button_style = """
             QPushButton {
-                background-color: #007acc;
-                color: white;
+                background-color: transparent;
+                color: #4da6ff;
                 font-weight: bold;
+                border: 1px solid #4da6ff;
                 border-radius: 6px;
             }
             QPushButton:hover {
-                background-color: #1593e3;
+                background-color: #4da6ff;
+                color: #111111;
+                border: 1px solid #4da6ff;
             }
-        """)
+        """
+
+        run_button = QPushButton("Run Lexical Analysis")
+        run_button.clicked.connect(self.run_lexer)
+        run_button.setFixedHeight(40)
+        run_button.setStyleSheet(button_style)
 
         load_button = QPushButton("Load SQL File")
         load_button.clicked.connect(self.load_file)
         load_button.setFixedHeight(40)
-        load_button.setStyleSheet("""
-            QPushButton {
-                background-color: #2d2d2d;
-                color: #cccccc;
-                font-weight: bold;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #3a3a3a;
-            }
-        """)
+        load_button.setStyleSheet(button_style)
+
+        save_button = QPushButton("Save Results as CSV")
+        save_button.clicked.connect(self.save_as_csv)
+        save_button.setFixedHeight(40)
+        save_button.setStyleSheet(button_style)
 
         button_layout.addWidget(run_button)
         button_layout.addWidget(load_button)
+        button_layout.addWidget(save_button)
 
         # Tabs
         self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("""
+            QTabBar::tab {
+                background-color: #111111;
+                color: #cccccc;
+                padding: 8px 16px;
+                border: 1px solid #333333;
+                border-bottom: none;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background-color: #1e1e1e;
+                color: #4da6ff;
+                border: 1px solid #4da6ff;
+                border-bottom: none;
+            }
+            QTabWidget::pane {
+                border: 1px solid #333333;
+                top: -1px;
+                background-color: #1e1e1e;
+            }
+        """)
+
         self.tokens_table = self.create_table(["Type", "Lexeme", "Line", "Column"])
         self.symbol_table = self.create_table(["Identifier", "First Line", "First Column", "Occurrences"])
         self.errors_table = self.create_table(["Line", "Message"])
@@ -93,13 +117,13 @@ class LexicalAnalyzerGUI(QWidget):
         self.apply_dark_theme()
 
     def apply_dark_theme(self):
-        """Apply modern dark theme like VS Code."""
+        """Apply modern dark theme similar to Visual Studio Code."""
         dark_palette = QPalette()
-        dark_palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
-        dark_palette.setColor(QPalette.ColorRole.Base, QColor("#252526"))
-        dark_palette.setColor(QPalette.ColorRole.Text, QColor("#e8e8e8"))
-        dark_palette.setColor(QPalette.ColorRole.Button, QColor("#007acc"))
-        dark_palette.setColor(QPalette.ColorRole.ButtonText, QColor("#ffffff"))
+        dark_palette.setColor(QPalette.ColorRole.Window, QColor("#0f0f0f"))
+        dark_palette.setColor(QPalette.ColorRole.Base, QColor("#1a1a1a"))
+        dark_palette.setColor(QPalette.ColorRole.Text, QColor("#e0e0e0"))
+        dark_palette.setColor(QPalette.ColorRole.Button, QColor("#1a1a1a"))
+        dark_palette.setColor(QPalette.ColorRole.ButtonText, QColor("#4da6ff"))
         self.setPalette(dark_palette)
 
     def create_table(self, headers):
@@ -109,18 +133,18 @@ class LexicalAnalyzerGUI(QWidget):
         table.setAlternatingRowColors(True)
         table.setStyleSheet("""
             QHeaderView::section {
-                background-color: #252526;
-                color: #61dafb;
+                background-color: #1a1a1a;
+                color: #4da6ff;
                 font-weight: bold;
                 border: none;
                 padding: 6px;
             }
             QTableWidget {
-                background-color: #1e1e1e;
-                alternate-background-color: #2d2d30;
+                background-color: #111111;
+                alternate-background-color: #1a1a1a;
                 color: #dcdcdc;
-                gridline-color: #3c3c3c;
-                selection-background-color: #094771;
+                gridline-color: #333333;
+                selection-background-color: #003366;
             }
         """)
         table.horizontalHeader().setStretchLastSection(True)
@@ -183,6 +207,46 @@ class LexicalAnalyzerGUI(QWidget):
         if file_path:
             with open(file_path, "r", encoding="utf-8") as f:
                 self.sql_input.setPlainText(f.read())
+
+    def save_as_csv(self):
+        current_tab = self.tabs.currentWidget()
+        tab_name = self.tabs.tabText(self.tabs.currentIndex())
+        file_path, _ = QFileDialog.getSaveFileName(
+            self,
+            f"Save {tab_name} as CSV",
+            f"{tab_name.lower().replace(' ', '_')}.csv",
+            "CSV Files (*.csv);;All Files (*)"
+        )
+        if not file_path:
+            return
+
+        try:
+            with open(file_path, "w", newline="", encoding="utf-8") as file:
+                writer = csv.writer(file)
+                headers = [
+                    current_tab.horizontalHeaderItem(i).text()
+                    for i in range(current_tab.columnCount())
+                ]
+                writer.writerow(headers)
+
+                for row in range(current_tab.rowCount()):
+                    row_data = [
+                        current_tab.item(row, col).text() if current_tab.item(row, col) else ""
+                        for col in range(current_tab.columnCount())
+                    ]
+                    writer.writerow(row_data)
+
+            QMessageBox.information(
+                self,
+                "Success",
+                f"{tab_name} has been saved successfully as CSV!\n\n{file_path}",
+            )
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"Failed to save {tab_name}.\nError: {str(e)}"
+            )
 
 
 if __name__ == "__main__":
