@@ -14,3 +14,6 @@ class SymbolTable:
 
     def get(self, identifier):
         return self.table.get(identifier)
+
+    def all_symbols(self):
+        return self.table
