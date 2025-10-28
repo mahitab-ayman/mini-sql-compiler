@@ -1,2 +1,8 @@
-# mini-sql-compiler
-A mini SQL-like compiler implemented in Python. Includes lexical, syntax, and semantic analyzers.
+# Mini SQL Compiler
+
+A mini SQL-like compiler in Python. Development is split across three phases:
+1. Lexical analysis (Phase 1)
+2. Syntax analysis (Phase 2)
+3. Semantic analysis (Phase 3)
+
+See docs/ for phase reports and src/ for code.
