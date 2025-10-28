@@ -1,6 +1,6 @@
-from token_definitions import TokenType
-from symbol_table import SymbolTable
-from error_handler import ErrorHandler
+from .token_definitions import TokenType
+from .symbol_table import SymbolTable
+from .error_handler import ErrorHandler
 
 class Token:
     def __init__(self, token_type, lexeme, line, column):
