@@ -18,11 +18,11 @@ def print_symbol_table(symbol_table):
 
 def print_errors(error_handler):
     print("\n=== ERRORS ===")
-    if not error_handler.errors:
+    if not error_handler.has_errors():
         print("No lexical errors found.")
-        return
-    for err in error_handler.errors:
-        print(f"[Line {err['line']}] {err['message']}")
+    else:
+        for err in error_handler.get_errors():
+            print(f"[Line {err['line']}] {err['message']}")
 
 def main():
     print("=== Mini SQL Compiler — Phase 1: Lexical Analysis ===")
