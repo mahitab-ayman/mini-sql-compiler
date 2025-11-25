@@ -26,12 +26,10 @@ class LexicalAnalyzer:
             'FLOAT', 'TEXT', 'AND', 'OR', 'NOT'
         }
 
-
     def current_char(self):
         if self.position >= len(self.source):
             return None
         return self.source[self.position]
-
 
     def advance(self):
         if self.position < len(self.source):
@@ -42,41 +40,56 @@ class LexicalAnalyzer:
                 self.column += 1
             self.position += 1
 
-
     def peek_char(self, offset=1):
         pos = self.position + offset
         if pos >= len(self.source):
             return None
         return self.source[pos]
 
-
     # Skip whitespace
     def skip_whitespace(self):
         while self.current_char() and self.current_char() in ' \t\n\r':
             self.advance()
 
-
     # Skip single line comment --
     def skip_single_line_comment(self):
-        self.advance()
-        self.advance()
+        self.advance()  # skip first '-'
+        self.advance()  # skip second '-'
         while self.current_char() and self.current_char() != '\n':
             self.advance()
         if self.current_char() == '\n':
             self.advance()
 
-
     # Skip multi-line comment ##
     def skip_multi_line_comment(self):
         start_line = self.line
-        self.advance()
+        start_col = self.column
+        
+        # Advance past opening ##
+        self.advance()  # skip first '#'
+        if self.current_char() != '#':
+            self.errors.add_error(
+                f"Invalid comment syntax at line {start_line}, column {start_col}",
+                start_line,
+                start_col
+            )
+            return
+        self.advance()  # skip second '#'
+        
+        # Look for closing ##
         while self.current_char():
-            if self.current_char() == '#':
-                self.advance()
+            if self.current_char() == '#' and self.peek_char() == '#':
+                self.advance()  # skip first '#' of closing
+                self.advance()  # skip second '#' of closing
                 return
             self.advance()
-        self.errors.add_error("Unclosed comment", start_line)
-
+        
+        # Reached end without finding closing ##
+        self.errors.add_error(
+            f"Error: unclosed comment starting at line {start_line}, column {start_col}",
+            start_line,
+            start_col
+        )
 
     # String literal
     def read_string(self):
@@ -84,19 +97,29 @@ class LexicalAnalyzer:
         start_col = self.column
         value = "'"
         self.advance()
+        
         while self.current_char() and self.current_char() != "'":
             if self.current_char() == '\n':
-                self.errors.add_error("Unclosed string", start_line)
+                self.errors.add_error(
+                    f"Error: unclosed string starting at line {start_line}, column {start_col}",
+                    start_line,
+                    start_col
+                )
                 return None
             value += self.current_char()
             self.advance()
+            
         if self.current_char() == "'":
             value += "'"
             self.advance()
             return Token(TokenType.STRING_LITERAL, value, start_line, start_col)
-        self.errors.add_error("Unclosed string", start_line)
+        
+        self.errors.add_error(
+            f"Error: unclosed string starting at line {start_line}, column {start_col}",
+            start_line,
+            start_col
+        )
         return None
-
 
     # Number literal
     def read_number(self):
@@ -104,6 +127,7 @@ class LexicalAnalyzer:
         start_col = self.column
         value = ""
         has_decimal = False
+        
         while self.current_char() and (self.current_char().isdigit() or self.current_char() == '.'):
             if self.current_char() == '.':
                 if has_decimal:
@@ -111,15 +135,26 @@ class LexicalAnalyzer:
                 has_decimal = True
             value += self.current_char()
             self.advance()
+            
         token_type = TokenType.FLOAT_LITERAL if has_decimal else TokenType.INT_LITERAL
         return Token(token_type, value, start_line, start_col)
-
 
     # Identifier or keyword (CASE-SENSITIVE - NO .upper())
     def read_identifier_or_keyword(self):
         start_line = self.line
         start_col = self.column
         value = ""
+        
+        # First character must be letter (not underscore for SQL-like)
+        if not self.current_char().isalpha():
+            self.errors.add_error(
+                f"Error: invalid identifier starting with '{self.current_char()}' at line {start_line}, column {start_col}",
+                start_line,
+                start_col
+            )
+            self.advance()
+            return None
+        
         while self.current_char() and (self.current_char().isalnum() or self.current_char() == '_'):
             value += self.current_char()
             self.advance()
@@ -131,7 +166,6 @@ class LexicalAnalyzer:
             self.symbol_table.add(value, start_line, start_col)
             return Token(TokenType.IDENTIFIER, value, start_line, start_col)
 
-
     # Operator (arithmetic + comparison)
     def read_operator(self):
         start_line = self.line
@@ -139,7 +173,6 @@ class LexicalAnalyzer:
         char = self.current_char()
         next_char = self.peek_char()
         op = char
-
 
         # Two-character operators: >=, <=, !=, <>
         if char in ['>', '<', '!'] and next_char == '=':
@@ -149,10 +182,8 @@ class LexicalAnalyzer:
             op += next_char
             self.advance()
 
-
         self.advance()
         return Token(TokenType.OPERATOR, op, start_line, start_col)
-
 
     # Main tokenizer
     def tokenize(self):
@@ -162,15 +193,13 @@ class LexicalAnalyzer:
                 break
             char = self.current_char()
 
-
             # Comments
             if char == '-' and self.peek_char() == '-':
                 self.skip_single_line_comment()
                 continue
-            if char == '#':
+            if char == '#' and self.peek_char() == '#':
                 self.skip_multi_line_comment()
                 continue
-
 
             # String
             if char == "'":
@@ -179,18 +208,27 @@ class LexicalAnalyzer:
                     self.tokens.append(token)
                 continue
 
-
             # Number
             if char.isdigit():
                 self.tokens.append(self.read_number())
                 continue
 
-
             # Identifier or keyword
-            if char.isalpha() or char == '_':
-                self.tokens.append(self.read_identifier_or_keyword())
+            if char.isalpha():
+                token = self.read_identifier_or_keyword()
+                if token:
+                    self.tokens.append(token)
                 continue
 
+            # Handle underscore as invalid start for identifier
+            if char == '_':
+                self.errors.add_error(
+                    f"Error: invalid identifier starting with '_' at line {self.line}, column {self.column}",
+                    self.line,
+                    self.column
+                )
+                self.advance()
+                continue
 
             # Operator
             if char in '+-*/%=><!':
@@ -198,18 +236,19 @@ class LexicalAnalyzer:
                 self.tokens.append(token)
                 continue
 
-
             # Delimiters
-            delimiters = {'(': 'lpar', ')': 'rpar', ',': 'comma', ';': 'semicolon', '.': 'dot'}
-            if char in delimiters:
+            if char in '(),;.':
                 self.tokens.append(Token(TokenType.PUNCTUATION, char, self.line, self.column))
                 self.advance()
                 continue
 
-
             # Invalid character
-            self.errors.add_error(f"Invalid character '{char}'", self.line, self.column)
+            self.errors.add_error(
+                f"Error: invalid character '{char}' at line {self.line}, column {self.column}",
+                self.line,
+                self.column
+            )
             self.advance()
 
-
         return self.tokens
+
