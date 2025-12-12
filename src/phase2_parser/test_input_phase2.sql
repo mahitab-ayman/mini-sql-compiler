@@ -121,3 +121,5 @@ UPDATE Products SET price = price * 1.1 WHERE price < 100;
 -- Complex DELETE with compound condition
 DELETE FROM Products WHERE price < 10 OR discontinued = 1;
 
+
+

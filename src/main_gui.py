@@ -2,25 +2,27 @@ import sys, csv
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QPushButton,
     QTextEdit, QTabWidget, QTableWidget, QTableWidgetItem,
-    QLabel, QFileDialog, QHBoxLayout, QMessageBox
+    QLabel, QFileDialog, QHBoxLayout, QMessageBox, QTreeWidget, QTreeWidgetItem
 )
 from PyQt6.QtGui import QFont, QColor, QPalette
 from PyQt6.QtCore import Qt
 from phase1_lexer.lexer import LexicalAnalyzer
+from phase1_lexer.token_definitions import TokenType
+from phase2_parser.parser import SyntaxAnalyzer
 
 
 class LexicalAnalyzerGUI(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Mini SQL Compiler — Lexical Analyzer")
-        self.setGeometry(200, 100, 1100, 750)
+        self.setWindowTitle("Mini SQL Compiler — Phase 1 & 2: Lexical & Syntax Analysis")
+        self.setGeometry(200, 100, 1200, 800)
         self.setup_ui()
 
     def setup_ui(self):
         layout = QVBoxLayout()
 
         # Title
-        title = QLabel("Mini SQL Compiler — Phase 1: Lexical Analysis")
+        title = QLabel("Mini SQL Compiler — Phase 1 & 2: Lexical & Syntax Analysis")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setFont(QFont("JetBrains Mono", 18, QFont.Weight.Bold))
         title.setStyleSheet("color: #4da6ff;")  # professional blue accent
@@ -56,8 +58,8 @@ class LexicalAnalyzerGUI(QWidget):
             }
         """
 
-        run_button = QPushButton("Run Lexical Analysis")
-        run_button.clicked.connect(self.run_lexer)
+        run_button = QPushButton("Run Analysis (Phase 1 & 2)")
+        run_button.clicked.connect(self.run_analysis)
         run_button.setFixedHeight(40)
         run_button.setStyleSheet(button_style)
 
@@ -100,13 +102,21 @@ class LexicalAnalyzerGUI(QWidget):
             }
         """)
 
+        # Phase 1 tables
         self.tokens_table = self.create_table(["Type", "Lexeme", "Line", "Column"])
         self.symbol_table = self.create_table(["Identifier", "First Line", "First Column", "Occurrences"])
-        self.errors_table = self.create_table(["Line", "Message"])
+        self.lexical_errors_table = self.create_table(["Line", "Column", "Message"])
+        
+        # Phase 2 components
+        self.parse_tree_widget = self.create_parse_tree_widget()
+        self.syntax_errors_table = self.create_table(["Line", "Column", "Message"])
 
-        self.tabs.addTab(self.tokens_table, "Tokens")
-        self.tabs.addTab(self.symbol_table, "Symbol Table")
-        self.tabs.addTab(self.errors_table, "Errors")
+        # Add tabs
+        self.tabs.addTab(self.tokens_table, "Tokens (Phase 1)")
+        self.tabs.addTab(self.symbol_table, "Symbol Table (Phase 1)")
+        self.tabs.addTab(self.lexical_errors_table, "Lexical Errors")
+        self.tabs.addTab(self.parse_tree_widget, "Parse Tree (Phase 2)")
+        self.tabs.addTab(self.syntax_errors_table, "Syntax Errors (Phase 2)")
 
         layout.addWidget(title)
         layout.addWidget(self.sql_input)
@@ -150,12 +160,35 @@ class LexicalAnalyzerGUI(QWidget):
         table.horizontalHeader().setStretchLastSection(True)
         return table
 
-    def run_lexer(self):
+    def create_parse_tree_widget(self):
+        """Create a tree widget for displaying the parse tree"""
+        tree = QTreeWidget()
+        tree.setHeaderLabel("Parse Tree")
+        tree.setStyleSheet("""
+            QTreeWidget {
+                background-color: #111111;
+                color: #dcdcdc;
+                border: 1px solid #333333;
+                font-family: Consolas;
+                font-size: 11px;
+            }
+            QTreeWidget::item {
+                padding: 4px;
+            }
+            QTreeWidget::item:selected {
+                background-color: #003366;
+                color: #4da6ff;
+            }
+        """)
+        return tree
+
+    def run_analysis(self):
         source_code = self.sql_input.toPlainText()
         if not source_code.strip():
             QMessageBox.warning(self, "No Input", "Please enter or load SQL code before running.")
             return
 
+        # ========== PHASE 1: LEXICAL ANALYSIS ==========
         lexer = LexicalAnalyzer(source_code)
         tokens = lexer.tokenize()
 
@@ -163,10 +196,28 @@ class LexicalAnalyzerGUI(QWidget):
         self.fill_symbols(lexer.symbol_table.all_symbols())
 
         try:
-            errors = lexer.errors.get_errors()
+            lexical_errors = lexer.errors.get_errors()
         except Exception:
-            errors = getattr(lexer.errors, "errors", [])
-        self.fill_errors(errors)
+            lexical_errors = getattr(lexer.errors, "errors", [])
+        self.fill_lexical_errors(lexical_errors)
+
+        # ========== PHASE 2: SYNTAX ANALYSIS ==========
+        # Filter out comments and errors from tokens for parser
+        filtered_tokens = [t for t in tokens if t.type not in [TokenType.COMMENT, TokenType.ERROR]]
+        
+        # Initialize and run the parser
+        parser = SyntaxAnalyzer(filtered_tokens)
+        parse_tree = parser.parse()
+        
+        # Display parse tree
+        self.fill_parse_tree(parse_tree)
+        
+        # Display syntax errors
+        try:
+            syntax_errors = parser.errors.get_errors()
+        except Exception:
+            syntax_errors = getattr(parser.errors, "errors", [])
+        self.fill_syntax_errors(syntax_errors)
 
     def fill_tokens(self, tokens):
         self.tokens_table.setRowCount(len(tokens))
@@ -187,18 +238,75 @@ class LexicalAnalyzerGUI(QWidget):
             self.symbol_table.setItem(i, 3, QTableWidgetItem(str(info.get("occurrences", 0))))
         self.symbol_table.resizeColumnsToContents()
 
-    def fill_errors(self, errors):
-        self.errors_table.setRowCount(len(errors))
+    def fill_lexical_errors(self, errors):
+        self.lexical_errors_table.setRowCount(len(errors))
         for i, err in enumerate(errors):
             if isinstance(err, dict):
                 line = str(err.get("line", ""))
+                column = str(err.get("column", ""))
                 msg = err.get("message", str(err))
             else:
                 line = ""
+                column = ""
                 msg = str(err)
-            self.errors_table.setItem(i, 0, QTableWidgetItem(line))
-            self.errors_table.setItem(i, 1, QTableWidgetItem(msg))
-        self.errors_table.resizeColumnsToContents()
+            self.lexical_errors_table.setItem(i, 0, QTableWidgetItem(line))
+            self.lexical_errors_table.setItem(i, 1, QTableWidgetItem(column))
+            self.lexical_errors_table.setItem(i, 2, QTableWidgetItem(msg))
+        self.lexical_errors_table.resizeColumnsToContents()
+
+    def fill_syntax_errors(self, errors):
+        self.syntax_errors_table.setRowCount(len(errors))
+        for i, err in enumerate(errors):
+            if isinstance(err, dict):
+                line = str(err.get("line", ""))
+                column = str(err.get("column", ""))
+                msg = err.get("message", str(err))
+            else:
+                line = ""
+                column = ""
+                msg = str(err)
+            self.syntax_errors_table.setItem(i, 0, QTableWidgetItem(line))
+            self.syntax_errors_table.setItem(i, 1, QTableWidgetItem(column))
+            self.syntax_errors_table.setItem(i, 2, QTableWidgetItem(msg))
+        self.syntax_errors_table.resizeColumnsToContents()
+
+    def fill_parse_tree(self, parse_tree):
+        """Fill the parse tree widget with the parse tree structure"""
+        self.parse_tree_widget.clear()
+        
+        if parse_tree is None:
+            root_item = QTreeWidgetItem(self.parse_tree_widget)
+            root_item.setText(0, "No parse tree generated")
+            return
+        
+        def add_tree_node(parent_item, node):
+            """Recursively add nodes to the tree widget"""
+            if node.value:
+                label = f"{node.node_type}: {node.value}"
+            else:
+                label = node.node_type
+            
+            if node.line and node.column:
+                label += f" (L:{node.line}, C:{node.column})"
+            
+            item = QTreeWidgetItem(parent_item)
+            item.setText(0, label)
+            
+            for child in node.children:
+                add_tree_node(item, child)
+        
+        root_item = QTreeWidgetItem(self.parse_tree_widget)
+        root_label = parse_tree.node_type
+        if parse_tree.value:
+            root_label += f": {parse_tree.value}"
+        if parse_tree.line and parse_tree.column:
+            root_label += f" (L:{parse_tree.line}, C:{parse_tree.column})"
+        root_item.setText(0, root_label)
+        
+        for child in parse_tree.children:
+            add_tree_node(root_item, child)
+        
+        self.parse_tree_widget.expandAll()
 
     def load_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -211,6 +319,43 @@ class LexicalAnalyzerGUI(QWidget):
     def save_as_csv(self):
         current_tab = self.tabs.currentWidget()
         tab_name = self.tabs.tabText(self.tabs.currentIndex())
+        
+        # Handle parse tree widget separately (save as text file)
+        if isinstance(current_tab, QTreeWidget):
+            file_path, _ = QFileDialog.getSaveFileName(
+                self,
+                f"Save {tab_name} as Text",
+                f"{tab_name.lower().replace(' ', '_')}.txt",
+                "Text Files (*.txt);;All Files (*)"
+            )
+            if not file_path:
+                return
+            
+            try:
+                with open(file_path, "w", encoding="utf-8") as file:
+                    def write_tree_item(item, indent=0):
+                        file.write("  " * indent + item.text(0) + "\n")
+                        for i in range(item.childCount()):
+                            write_tree_item(item.child(i), indent + 1)
+                    
+                    root = current_tab.topLevelItem(0)
+                    if root:
+                        write_tree_item(root)
+                
+                QMessageBox.information(
+                    self,
+                    "Success",
+                    f"{tab_name} has been saved successfully as text file!\n\n{file_path}",
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self,
+                    "Error",
+                    f"Failed to save {tab_name}.\nError: {str(e)}"
+                )
+            return
+        
+        # Handle table widgets
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             f"Save {tab_name} as CSV",
