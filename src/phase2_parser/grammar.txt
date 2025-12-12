@@ -1,0 +1,128 @@
+================================================================================
+FORMAL GRAMMAR FOR SQL-LIKE LANGUAGE (EBNF Notation)
+================================================================================
+
+Program:
+    Program -> Statement (';' Statement)* ';'?
+
+Statement:
+    Statement -> SELECT_STMT | INSERT_STMT | UPDATE_STMT | DELETE_STMT | CREATE_STMT
+
+-- SELECT Statement
+SELECT_STMT:
+    SELECT_STMT -> SELECT SelectList FROM Identifier [WHERE Condition]
+
+SelectList:
+    SelectList -> '*' | ColumnList
+    ColumnList -> SelectItem (',' SelectItem)*
+    SelectItem -> Identifier | Expression
+
+-- INSERT Statement
+INSERT_STMT:
+    INSERT_STMT -> INSERT INTO Identifier VALUES '(' ValueList ')'
+
+ValueList:
+    ValueList -> Value (',' Value)*
+
+Value:
+    Value -> Literal | Expression
+
+-- UPDATE Statement
+UPDATE_STMT:
+    UPDATE_STMT -> UPDATE Identifier SET AssignmentList [WHERE Condition]
+
+AssignmentList:
+    AssignmentList -> Assignment (',' Assignment)*
+
+Assignment:
+    Assignment -> Identifier '=' Value
+
+-- DELETE Statement
+DELETE_STMT:
+    DELETE_STMT -> DELETE FROM Identifier [WHERE Condition]
+
+-- CREATE TABLE Statement
+CREATE_STMT:
+    CREATE_STMT -> CREATE TABLE Identifier '(' ColumnDefList ')'
+
+ColumnDefList:
+    ColumnDefList -> ColumnDef (',' ColumnDef)*
+
+ColumnDef:
+    ColumnDef -> Identifier DataType
+
+DataType:
+    DataType -> INT | FLOAT | TEXT
+
+-- WHERE Clause and Conditions
+WHERE_CLAUSE:
+    WHERE_CLAUSE -> WHERE Condition
+
+Condition:
+    Condition -> Condition OR ConditionTerm
+               | ConditionTerm
+
+ConditionTerm:
+    ConditionTerm -> ConditionTerm AND ConditionFactor
+                   | ConditionFactor
+
+ConditionFactor:
+    ConditionFactor -> NOT ConditionFactor
+                     | Comparison
+                     | '(' Condition ')'
+
+Comparison:
+    Comparison -> Expression Operator Expression
+                | Identifier
+
+Operator:
+    Operator -> '=' | '!=' | '<>' | '<' | '<=' | '>' | '>='
+
+-- Expressions
+Expression:
+    Expression -> Term (('+' | '-') Term)*
+
+Term:
+    Term -> Factor (('*' | '/' | '%') Factor)*
+
+Factor:
+    Factor -> Identifier
+           | Literal
+           | '(' Expression ')'
+
+-- Base Elements
+Identifier:
+    Identifier -> [a-zA-Z_][a-zA-Z0-9_]*
+
+Literal:
+    Literal -> INT_LITERAL | FLOAT_LITERAL | STRING_LITERAL
+
+INT_LITERAL:
+    INT_LITERAL -> [0-9]+
+
+FLOAT_LITERAL:
+    FLOAT_LITERAL -> [0-9]+ '.' [0-9]+
+
+STRING_LITERAL:
+    STRING_LITERAL -> ''' (any character except newline and ') '''
+
+================================================================================
+OPERATOR PRECEDENCE (from highest to lowest):
+================================================================================
+1. NOT (logical negation)
+2. AND (logical AND)
+3. OR (logical OR)
+4. Arithmetic: *, /, %
+5. Arithmetic: +, -
+6. Comparison: =, !=, <>, <, <=, >, >=
+
+================================================================================
+NOTES:
+================================================================================
+- Keywords are case-sensitive: SELECT, FROM, WHERE, etc.
+- Identifiers follow the pattern: [a-zA-Z_][a-zA-Z0-9_]*
+- String literals are enclosed in single quotes: 'text'
+- Comments are removed during lexical analysis and not part of syntax
+- Multiple statements can be separated by semicolons
+- WHERE clause is optional in SELECT, UPDATE, and DELETE statements
+
