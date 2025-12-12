@@ -139,32 +139,38 @@ class LexicalAnalyzer:
         token_type = TokenType.FLOAT_LITERAL if has_decimal else TokenType.INT_LITERAL
         return Token(token_type, value, start_line, start_col)
 
-    # Identifier or keyword (CASE-SENSITIVE - NO .upper())
+    # Identifier or keyword (CASE-SENSITIVE)
     def read_identifier_or_keyword(self):
         start_line = self.line
         start_col = self.column
         value = ""
-        
-        # First character must be letter (not underscore for SQL-like)
+
+        # First character must be a letter
         if not self.current_char().isalpha():
+            # Skip entire invalid sequence of letters/digits/underscores
+            while self.current_char() and (self.current_char().isalnum() or self.current_char() == '_'):
+                value += self.current_char()
+                self.advance()
             self.errors.add_error(
-                f"Error: invalid identifier starting with '{self.current_char()}' at line {start_line}, column {start_col}",
+                f"Error: invalid identifier starting with '{value}' at line {start_line}, column {start_col}",
                 start_line,
                 start_col
             )
-            self.advance()
             return None
-        
+
+        # Read valid identifier
         while self.current_char() and (self.current_char().isalnum() or self.current_char() == '_'):
             value += self.current_char()
             self.advance()
-        
-        # CASE-SENSITIVE: Check exact match only (NO .upper())
+
+        # Check for keyword
         if value in self.keywords:
             return Token(TokenType.KEYWORD, value, start_line, start_col)
         else:
             self.symbol_table.add(value, start_line, start_col)
             return Token(TokenType.IDENTIFIER, value, start_line, start_col)
+
+
 
     # Operator (arithmetic + comparison)
     def read_operator(self):
@@ -213,22 +219,13 @@ class LexicalAnalyzer:
                 self.tokens.append(self.read_number())
                 continue
 
-            # Identifier or keyword
-            if char.isalpha():
+            # Identifier, keyword, or invalid identifier
+            if char.isalpha() or char in '_0123456789':
                 token = self.read_identifier_or_keyword()
                 if token:
                     self.tokens.append(token)
                 continue
 
-            # Handle underscore as invalid start for identifier
-            if char == '_':
-                self.errors.add_error(
-                    f"Error: invalid identifier starting with '_' at line {self.line}, column {self.column}",
-                    self.line,
-                    self.column
-                )
-                self.advance()
-                continue
 
             # Operator
             if char in '+-*/%=><!':
@@ -251,4 +248,5 @@ class LexicalAnalyzer:
             self.advance()
 
         return self.tokens
+
 
