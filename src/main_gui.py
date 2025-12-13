@@ -163,7 +163,10 @@ class LexicalAnalyzerGUI(QWidget):
     def create_parse_tree_widget(self):
         """Create a tree widget for displaying the parse tree"""
         tree = QTreeWidget()
-        tree.setHeaderLabel("Parse Tree")
+        tree.setHeaderLabel("Parse Tree Structure")
+        tree.setRootIsDecorated(True)  # Show tree lines
+        tree.setAlternatingRowColors(True)
+        tree.setIndentation(20)  # Indentation for child nodes
         tree.setStyleSheet("""
             QTreeWidget {
                 background-color: #111111;
@@ -171,13 +174,40 @@ class LexicalAnalyzerGUI(QWidget):
                 border: 1px solid #333333;
                 font-family: Consolas;
                 font-size: 11px;
+                show-decoration-selected: 1;
             }
             QTreeWidget::item {
                 padding: 4px;
+                border: none;
             }
             QTreeWidget::item:selected {
                 background-color: #003366;
                 color: #4da6ff;
+            }
+            QTreeWidget::item:hover {
+                background-color: #1a1a2e;
+            }
+            QTreeWidget::branch {
+                background-color: #111111;
+            }
+            QTreeWidget::branch:has-siblings:!adjoins-item {
+                border-image: url(vline.png) 0;
+            }
+            QTreeWidget::branch:has-siblings:adjoins-item {
+                border-image: url(branch-more.png) 0;
+            }
+            QTreeWidget::branch:!has-children:!has-siblings:adjoins-item {
+                border-image: url(branch-end.png) 0;
+            }
+            QTreeWidget::branch:has-children:!has-siblings:closed,
+            QTreeWidget::branch:closed:has-children:has-siblings {
+                border-image: none;
+                image: url(branch-closed.png);
+            }
+            QTreeWidget::branch:open:has-children:!has-siblings,
+            QTreeWidget::branch:open:has-children:has-siblings {
+                border-image: none;
+                image: url(branch-open.png);
             }
         """)
         return tree
@@ -277,36 +307,66 @@ class LexicalAnalyzerGUI(QWidget):
         if parse_tree is None:
             root_item = QTreeWidgetItem(self.parse_tree_widget)
             root_item.setText(0, "No parse tree generated")
+            root_item.setForeground(0, QColor("#ff6b6b"))
             return
         
         def add_tree_node(parent_item, node):
             """Recursively add nodes to the tree widget"""
+            # Create tree item
+            item = QTreeWidgetItem(parent_item)
+            
+            # Format the label
             if node.value:
                 label = f"{node.node_type}: {node.value}"
             else:
                 label = node.node_type
             
+            # Add position info if available (as part of label)
             if node.line and node.column:
-                label += f" (L:{node.line}, C:{node.column})"
+                label += f" [L:{node.line}, C:{node.column}]"
             
-            item = QTreeWidgetItem(parent_item)
             item.setText(0, label)
             
+            # Color code by node type for better visualization
+            if "STMT" in node.node_type:
+                item.setForeground(0, QColor("#4da6ff"))  # Blue for statements
+            elif "CONDITION" in node.node_type or "COMPARISON" in node.node_type:
+                item.setForeground(0, QColor("#ffd93d"))  # Yellow for conditions
+            elif "EXPRESSION" in node.node_type or "TERM" in node.node_type or "FACTOR" in node.node_type:
+                item.setForeground(0, QColor("#6bcf7f"))  # Green for expressions
+            elif node.node_type == "IDENTIFIER":
+                item.setForeground(0, QColor("#ff6b9d"))  # Pink for identifiers
+            elif node.node_type == "LITERAL":
+                item.setForeground(0, QColor("#c44569"))  # Purple for literals
+            elif "OPERATOR" in node.node_type or node.node_type == "DATA_TYPE":
+                item.setForeground(0, QColor("#feca57"))  # Orange for operators/types
+            else:
+                item.setForeground(0, QColor("#dcdcdc"))  # Default white
+            
+            # Recursively add children
             for child in node.children:
                 add_tree_node(item, child)
         
+        # Create root item
         root_item = QTreeWidgetItem(self.parse_tree_widget)
         root_label = parse_tree.node_type
         if parse_tree.value:
             root_label += f": {parse_tree.value}"
         if parse_tree.line and parse_tree.column:
-            root_label += f" (L:{parse_tree.line}, C:{parse_tree.column})"
+            root_label += f" [L:{parse_tree.line}, C:{parse_tree.column}]"
         root_item.setText(0, root_label)
+        root_item.setForeground(0, QColor("#4da6ff"))
+        root_item.setFont(0, QFont("Consolas", 12, QFont.Weight.Bold))
         
+        # Add all children
         for child in parse_tree.children:
             add_tree_node(root_item, child)
         
+        # Expand all nodes by default to show full tree
         self.parse_tree_widget.expandAll()
+        
+        # Resize columns to fit content
+        self.parse_tree_widget.resizeColumnToContents(0)
 
     def load_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
